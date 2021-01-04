@@ -24,7 +24,7 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.app.AlertDialog;
-import android.app.HomeVisibilityObserver;
+import android.app.HomeVisibilityListener;
 import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -171,7 +171,7 @@ public class StkAppService extends Service implements Runnable {
     private AppInterface[] mStkService = null;
     private StkContext[] mStkContext = null;
     private int mSimCount = 0;
-    private HomeVisibilityObserver mHomeVisibilityObserver = null;
+    private HomeVisibilityListener mHomeVisibilityListener = null;
     private BroadcastReceiver mLocaleChangeReceiver = null;
     private TonePlayer mTonePlayer = null;
     private Vibrator mVibrator = null;
@@ -303,6 +303,7 @@ public class StkAppService extends Service implements Runnable {
     // The reason based on Intent.ACTION_CLOSE_SYSTEM_DIALOGS.
     private static final String SYSTEM_DIALOG_REASON_KEY = "reason";
     private static final String SYSTEM_DIALOG_REASON_HOME_KEY = "homekey";
+    private static final String SYSTEM_DIALOG_REASON_RECENTAPPS_KEY = "recentapps";
     private BroadcastReceiver mHomeKeyEventReceiver = null;
 
     @Override
@@ -834,10 +835,12 @@ public class StkAppService extends Service implements Runnable {
         }
         mHomeKeyEventReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
-                if (SYSTEM_DIALOG_REASON_HOME_KEY.equals(
-                        intent.getStringExtra(SYSTEM_DIALOG_REASON_KEY))) {
-                    Message message = mServiceHandler.obtainMessage();
-                    message.arg1 = OP_HOME_KEY_PRESSED;
+                final String reason = intent.getStringExtra(SYSTEM_DIALOG_REASON_KEY);
+                // gesture-based launchers may interpret swipe-up as "recent apps" instead of
+                // "home" so we accept both here
+                if (SYSTEM_DIALOG_REASON_HOME_KEY.equals(reason)
+                    || SYSTEM_DIALOG_REASON_RECENTAPPS_KEY.equals(reason)) {
+                    Message message = mServiceHandler.obtainMessage(OP_HOME_KEY_PRESSED);
                     mServiceHandler.sendMessage(message);
                 }
             }
@@ -1689,7 +1692,7 @@ public class StkAppService extends Service implements Runnable {
 
         Menu menu = getMainMenu(slotId);
         if (menu == null || TextUtils.isEmpty(menu.title)) {
-            builder.setContentTitle(getResources().getString(R.string.app_name));
+            builder.setContentTitle("");
         } else {
             builder.setContentTitle(menu.title);
         }
@@ -1857,8 +1860,8 @@ public class StkAppService extends Service implements Runnable {
     }
 
     private synchronized void registerHomeVisibilityObserver() {
-        if (mHomeVisibilityObserver == null) {
-            mHomeVisibilityObserver = new HomeVisibilityObserver() {
+        if (mHomeVisibilityListener == null) {
+            mHomeVisibilityListener = new HomeVisibilityListener() {
                 @Override
                 public void onHomeVisibilityChanged(boolean isHomeActivityVisible) {
                     if (isHomeActivityVisible) {
@@ -1869,7 +1872,7 @@ public class StkAppService extends Service implements Runnable {
                 }
             };
             ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-            am.registerHomeVisibilityObserver(mHomeVisibilityObserver);
+            am.addHomeVisibilityListener(Runnable::run, mHomeVisibilityListener);
             CatLog.d(LOG_TAG, "Started to observe the foreground activity");
         }
     }
@@ -1901,11 +1904,11 @@ public class StkAppService extends Service implements Runnable {
     }
 
     private synchronized void unregisterHomeVisibilityObserver() {
-        if (mHomeVisibilityObserver != null) {
+        if (mHomeVisibilityListener != null) {
             ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-            am.unregisterHomeVisibilityObserver(mHomeVisibilityObserver);
+            am.removeHomeVisibilityListener(mHomeVisibilityListener);
             CatLog.d(LOG_TAG, "Stopped to observe the foreground activity");
-            mHomeVisibilityObserver = null;
+            mHomeVisibilityListener = null;
         }
     }
 
