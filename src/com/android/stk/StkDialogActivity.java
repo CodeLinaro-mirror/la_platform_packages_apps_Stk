@@ -79,7 +79,7 @@ public class StkDialogActivity extends Activity {
             finish();
             return;
         }
-
+        StkApp.setupEdgeToEdge(this);
         // New Dialog is created - set to no response sent
         mIsResponseSent = false;
 
