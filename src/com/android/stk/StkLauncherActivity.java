@@ -68,6 +68,8 @@ public class StkLauncherActivity extends ListActivity {
         actionBar.setCustomView(R.layout.stk_title);
         actionBar.setDisplayShowCustomEnabled(true);
 
+        StkApp.setupEdgeToEdge(this);
+
         setContentView(R.layout.stk_menu_list);
         mTitleTextView = (TextView) findViewById(R.id.title_text);
         mTitleIconView = (ImageView) findViewById(R.id.title_icon);
